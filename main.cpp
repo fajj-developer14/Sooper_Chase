@@ -9,6 +9,7 @@
 #include <random>
 #include <algorithm>
 #include <string>
+#include <iomanip>
 
 void setRawMode(bool enable) {
     static struct termios oldt;
@@ -97,7 +98,7 @@ class gameGrid {
 
 class Player {
    private:
-      int x, y;
+      int x, y, score = 0;
       gameGrid& map;
       std::vector<Direction> directionField;
 
@@ -128,6 +129,7 @@ class Player {
          break;
       }
       if (map.getTile(x, y) == TileType::ENEMY) return;
+      if (map.getTile(x,y) == TileType::COIN) ++score;
       map.setTile(x, y, TileType::PLAYER);
    }
 
@@ -171,6 +173,12 @@ class Player {
    std::vector<Direction> getDirectionField() {
       return directionField;
    }
+   int getScore() {
+      return score;
+   }
+   void updateScore(int num) {
+      score += num;
+   }
 };
 
 class Enemy {
@@ -202,16 +210,17 @@ class Enemy {
                ++y;
                break;
             case Direction::LEFT:
-               x-=1;
+               --x;
                break;
             case Direction::RIGHT:
-               x+=1;
+               ++x;
                break;
             case Direction::NONE:
                break;
             default:
                break;
          }
+         if (map.getTile(x, y) == TileType::COIN) player.updateScore(-1); //decrement score if enemy gets the coin
          map.setTile(x,y, TileType::ENEMY);
          accumulatedFrames -= framesPerStep;
       }
@@ -222,7 +231,7 @@ class Enemy {
  
 void generateCoins(gameGrid& map) {
    static int accumulatedFrames = 0;
-   int x,y, framesPerCoin = 120;
+   int x,y, framesPerCoin = 240;
    ++accumulatedFrames;
    while (accumulatedFrames >= framesPerCoin) {
       do {
@@ -239,9 +248,9 @@ int main() {
    srand(time(0));
    std::cout << "\033[?25l" << std::flush; //to hide the cursor
    bool isRunning = true;
-   gameGrid worldMap(18, 40);
+   gameGrid worldMap(18, 50);
    Player player(worldMap);
-   Enemy enemy(worldMap, player);
+   Enemy enemy(worldMap, player);   
 
 
    char letter;
@@ -285,12 +294,12 @@ int main() {
          }
          std::cout << std::endl;
       }
+      std::cout << std::setw(50) << " Score: " << player.getScore() << std::endl;
 
       usleep(16000); //60fps
    }
    std::cout << "\033[?25h";  //to make the cursor reappear
    setRawMode(false);
-   std::cout << "\t\t\tGAME ENDED \n";
-   std::cout << "\t\t\tScore: Add score here\n";
+   std::cout << std::setw(55) << "GAME ENDED \n";
    return 0;
 }
