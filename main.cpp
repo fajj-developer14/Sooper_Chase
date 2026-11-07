@@ -177,7 +177,8 @@ class Enemy {
    private:
       gameGrid& map;
       Player& player;
-      int x, y;
+      int x, y, framesPerStep = 10, accumulatedFrames = 0;
+
    public:
       Enemy(gameGrid& g, Player& p) : map(g), player(p) {
          do {
@@ -188,8 +189,6 @@ class Enemy {
       }
    void activate() {
       std::vector<Direction> directionField = player.getDirectionField();
-      static int accumulatedFrames = 0;
-      int framesPerStep = 10;
       ++accumulatedFrames;
 
       while (accumulatedFrames >= framesPerStep) {
@@ -220,12 +219,27 @@ class Enemy {
 };
 
 
+ 
+void generateCoins(gameGrid& map) {
+   static int accumulatedFrames = 0;
+   int x,y, framesPerCoin = 120;
+   ++accumulatedFrames;
+   while (accumulatedFrames >= framesPerCoin) {
+      do {
+         x = rand() % (map.getWidth());
+         y = rand() % (map.getHeight());
+      } while(map.getTile(x,y) != TileType::SPACE);
+      accumulatedFrames -= framesPerCoin;
+   }
+   map.setTile(x, y, TileType::COIN);
+}
+
 int main() {
    setRawMode(true);
    srand(time(0));
    std::cout << "\033[?25l" << std::flush; //to hide the cursor
    bool isRunning = true;
-   gameGrid worldMap(18, 80);
+   gameGrid worldMap(18, 40);
    Player player(worldMap);
    Enemy enemy(worldMap, player);
 
@@ -237,10 +251,12 @@ int main() {
       letter = 0;
 
       if (kbhit()) letter = getchar();
-      if (letter == 'q') isRunning = false;
+      // if (letter == 'q') isRunning = false;
       player.move(letter);
       player.setDirectionField();
       enemy.activate();
+      generateCoins(worldMap);
+
       isRunning = !player.isCollidingWithEnemy();
 
       for(int y=0; y < worldMap.getHeight(); ++y) {
@@ -249,16 +265,19 @@ int main() {
             switch (tile)
             {
             case TileType::WALL:
-               std::cout << "#";
+               std::cout << "🧱";
                break;
             case TileType::SPACE:
-               std::cout << " ";
+               std::cout << "  ";  //two spaces to cater for double width emojis
                break;
             case TileType::PLAYER:
-               std::cout << "P";
+               std::cout << "🐥";
                break;
             case TileType::ENEMY:
-               std::cout << "X";
+               std::cout << "🧟";
+               break;
+            case TileType::COIN:
+               std::cout << "🪙 ";  //trailing space for the double width
                break;
             default:
                break;
@@ -267,7 +286,7 @@ int main() {
          std::cout << std::endl;
       }
 
-      usleep(16000);
+      usleep(16000); //60fps
    }
    std::cout << "\033[?25h";  //to make the cursor reappear
    setRawMode(false);
