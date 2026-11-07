@@ -6,9 +6,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include <queue>
-#include <cmath>
 #include <random>
 #include <algorithm>
+#include <string>
 
 void setRawMode(bool enable) {
     static struct termios oldt;
@@ -31,7 +31,7 @@ bool kbhit() {
 }
 
 enum class Direction {
-   None,
+   NONE,
    UP,
    DOWN,
    LEFT,
@@ -101,9 +101,9 @@ class Player {
       gameGrid& map;
       std::vector<Direction> directionField;
 
-   
+
    public:
-   Player(gameGrid& m): map(m), directionField(map.getHeight()*map.getWidth(), Direction::None) {
+   Player(gameGrid& m): map(m), directionField(map.getHeight()*map.getWidth(), Direction::NONE) {
       x = y = 1;
       map.setTile(x, y, TileType::PLAYER);
    }
@@ -113,22 +113,28 @@ class Player {
       switch (letter)
       {
       case 'w':
-         map.getTile(x, y-1) != TileType::WALL ? --y : 0;
+         if (map.getTile(x, y-1) != TileType::WALL) --y;
          break;
       case 's':
-         map.getTile(x, y+1) != TileType::WALL ? ++y : 0;
+         if (map.getTile(x, y+1) != TileType::WALL) ++y;
          break;
       case 'a':
-         map.getTile(x-1, y) != TileType::WALL ? x-=1 : 0;
+         if (map.getTile(x-1, y) != TileType::WALL) --x;
          break;
       case 'd':
-         map.getTile(x+1, y) != TileType::WALL ? x+=1 : 0;
+         if (map.getTile(x+1, y) != TileType::WALL) ++x;
          break;
       default:
          break;
       }
+      if (map.getTile(x, y) == TileType::ENEMY) return;
       map.setTile(x, y, TileType::PLAYER);
    }
+
+   bool isCollidingWithEnemy() {
+      return map.getTile(x,y) == TileType::ENEMY;
+   }
+
    void setDirectionField() {
       std::vector<bool> visited(map.getHeight()*map.getWidth(), false);
       std::queue<int> q;
@@ -136,11 +142,12 @@ class Player {
 
 
       Direction directionLabel[] = {Direction::RIGHT, Direction::LEFT, Direction::UP, Direction::DOWN};
-      
+
       q.push(map.toIndex(x, y));
       visited[map.toIndex(x,y)] = true;
-      std::vector<int> indices = {0, 1, 2, 3};
+      directionField[map.toIndex(x,y)] = Direction::NONE;
 
+      std::vector<int> indices = {0, 1, 2, 3};
       std::random_device rd;
       std::mt19937 g(rd());
 
@@ -148,9 +155,10 @@ class Player {
          int curr = q.front();
          q.pop();
          std::shuffle(indices.begin(), indices.end(), g); //shuffled indices to remove the L-shape issue in bfs
+         
          for (int i = 0; i < 4; ++i) {
             int nextNode = curr + possibleMoves[indices[i]] + possibleMoves[3-indices[i]]*map.getWidth();
-            
+
             if (nextNode >= 0 && nextNode < visited.size() && map.getTile(nextNode) != TileType::WALL && !visited[nextNode]) {
                visited[nextNode] = true;
                q.push(nextNode);
@@ -158,7 +166,6 @@ class Player {
             }
          }
       }
-      std::cout << std::endl;
    }
 
    std::vector<Direction> getDirectionField() {
@@ -184,12 +191,9 @@ class Enemy {
       static int accumulatedFrames = 0;
       int framesPerStep = 10;
       ++accumulatedFrames;
-      // std::cout << "x: " << x << "y: " << y << "          " <<  std::endl;
-      // std::cout << map.toIndex(x, y) << "          " << std::endl;
-      // std::cout << directionField[map.toIndex(x, y)] << "          " << std::endl;
+
       while (accumulatedFrames >= framesPerStep) {
          Direction direction = directionField[map.toIndex(x, y)];
-         // std::cout << static_cast<int>(direction) << std::endl;
          map.setTile(x,y, TileType::SPACE);
          switch (direction) {
             case Direction::UP:
@@ -204,6 +208,10 @@ class Enemy {
             case Direction::RIGHT:
                x+=1;
                break;
+            case Direction::NONE:
+               break;
+            default:
+               break;
          }
          map.setTile(x,y, TileType::ENEMY);
          accumulatedFrames -= framesPerStep;
@@ -211,10 +219,11 @@ class Enemy {
    }
 };
 
+
 int main() {
    setRawMode(true);
    srand(time(0));
-   std::cout << "\033[?25l" << std::flush;
+   std::cout << "\033[?25l" << std::flush; //to hide the cursor
    bool isRunning = true;
    gameGrid worldMap(18, 80);
    Player player(worldMap);
@@ -224,7 +233,7 @@ int main() {
    char letter;
 
    while (isRunning) {
-      std::cout << "\033[H";
+      std::cout << "\033[H";   //to make the cursor appear at the top left in each loop
       letter = 0;
 
       if (kbhit()) letter = getchar();
@@ -232,7 +241,8 @@ int main() {
       player.move(letter);
       player.setDirectionField();
       enemy.activate();
-      
+      isRunning = !player.isCollidingWithEnemy();
+
       for(int y=0; y < worldMap.getHeight(); ++y) {
          for (int x=0; x < worldMap.getWidth(); ++x) {
             TileType tile = worldMap.getTile(x, y);
@@ -243,7 +253,7 @@ int main() {
                break;
             case TileType::SPACE:
                std::cout << " ";
-               break;            
+               break;
             case TileType::PLAYER:
                std::cout << "P";
                break;
@@ -259,7 +269,9 @@ int main() {
 
       usleep(16000);
    }
-   std::cout << "\033[?25h" << std::endl;
+   std::cout << "\033[?25h";  //to make the cursor reappear
    setRawMode(false);
+   std::cout << "\t\t\tGAME ENDED \n";
+   std::cout << "\t\t\tScore: Add score here\n";
    return 0;
 }
