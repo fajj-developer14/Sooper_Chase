@@ -9,7 +9,6 @@
 #include <random>
 #include <algorithm>
 #include <string>
-#include <iomanip>
 
 void setRawMode(bool enable) {
     static struct termios oldt;
@@ -227,11 +226,11 @@ class Enemy {
    }
 };
 
-
  
-void generateCoins(gameGrid& map) {
+void generateCoins(gameGrid& map, Player& player, int winningScore) {
    static int accumulatedFrames = 0;
    int x,y, framesPerCoin = 280;
+   static bool lastCoin = false;
    ++accumulatedFrames;
    while (accumulatedFrames >= framesPerCoin) {
       do {
@@ -239,19 +238,20 @@ void generateCoins(gameGrid& map) {
          y = rand() % (map.getHeight());
       } while(map.getTile(x,y) != TileType::SPACE);
       accumulatedFrames -= framesPerCoin;
+      map.setTile(x, y, TileType::COIN);
    }
-   map.setTile(x, y, TileType::COIN);
+   lastCoin = player.getScore() == winningScore - 1;
 }
 
 void addWalls(gameGrid& map, Player& player) {
    static int accumulateFrames = 0, round = 1;
-   int framesPerRound = 600;
+   int framesPerRound = 400;
    ++accumulateFrames;
    if (round == map.getHeight()-3) return;
    while(accumulateFrames >= framesPerRound) {
       for (int x =  1; x < map.getWidth() - 1; ++x) {
          if (map.getTile(x, round) == TileType::PLAYER) player.move('s');
-         else if(map.getTile(x,round) == TileType::COIN) player.updateScore(-1);
+         else if(map.getTile(x,round) == TileType::COIN) map.setTile(x, round+1, TileType::COIN);
          map.setTile(x, round, TileType::WALL);
       }
       accumulateFrames -= framesPerRound;
@@ -262,13 +262,13 @@ void addWalls(gameGrid& map, Player& player) {
 int main() {
    setRawMode(true);
    srand(time(0));
-   const int winningScore = 2;
-   std::cout << "\033[?25l"; //to hide the cursor
-   bool isRunning = true;
    gameGrid worldMap(18, 50);
    Player player(worldMap);
-   Enemy enemy(worldMap, player);   
+   Enemy enemy(worldMap, player); 
+   const int winningScore = 15;
 
+   std::cout << "\033[?25l"; //to hide the cursor
+   bool isRunning = true;    
 
    char letter;
 
@@ -281,7 +281,7 @@ int main() {
       player.move(letter);
       player.setDirectionField();
       enemy.activate();
-      generateCoins(worldMap);
+      generateCoins(worldMap, player, winningScore);
       addWalls(worldMap, player);
       isRunning = !player.isCollidingWithEnemy() && player.getScore() < winningScore;
 
@@ -311,12 +311,12 @@ int main() {
          }
          std::cout << std::endl;
       }
-      std::cout << std::setw(50) << " Score: " << player.getScore() << std::endl;
+      std::cout << std::string(45, ' ') << "Score: " << player.getScore() << " " << std::endl;
 
       usleep(16000); //60fps
    }
    std::cout << "\033[?25h";  //to make the cursor reappear
    setRawMode(false);
-   std::cout << std::setw(55) << "GAME OVER \n";
+   std::cout << std::string(45, ' ') << (player.getScore() != winningScore ? "GAME OVER" : "YOU WON") << std::endl;
    return 0;
 }
