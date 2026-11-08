@@ -231,7 +231,7 @@ class Enemy {
  
 void generateCoins(gameGrid& map) {
    static int accumulatedFrames = 0;
-   int x,y, framesPerCoin = 240;
+   int x,y, framesPerCoin = 280;
    ++accumulatedFrames;
    while (accumulatedFrames >= framesPerCoin) {
       do {
@@ -243,10 +243,27 @@ void generateCoins(gameGrid& map) {
    map.setTile(x, y, TileType::COIN);
 }
 
+void addWalls(gameGrid& map, Player& player) {
+   static int accumulateFrames = 0, round = 1;
+   int framesPerRound = 600;
+   ++accumulateFrames;
+   if (round == map.getHeight()-3) return;
+   while(accumulateFrames >= framesPerRound) {
+      for (int x =  1; x < map.getWidth() - 1; ++x) {
+         if (map.getTile(x, round) == TileType::PLAYER) player.move('s');
+         else if(map.getTile(x,round) == TileType::COIN) player.updateScore(-1);
+         map.setTile(x, round, TileType::WALL);
+      }
+      accumulateFrames -= framesPerRound;
+      ++round;
+   }
+}
+
 int main() {
    setRawMode(true);
    srand(time(0));
-   std::cout << "\033[?25l" << std::flush; //to hide the cursor
+   const int winningScore = 2;
+   std::cout << "\033[?25l"; //to hide the cursor
    bool isRunning = true;
    gameGrid worldMap(18, 50);
    Player player(worldMap);
@@ -265,8 +282,8 @@ int main() {
       player.setDirectionField();
       enemy.activate();
       generateCoins(worldMap);
-
-      isRunning = !player.isCollidingWithEnemy();
+      addWalls(worldMap, player);
+      isRunning = !player.isCollidingWithEnemy() && player.getScore() < winningScore;
 
       for(int y=0; y < worldMap.getHeight(); ++y) {
          for (int x=0; x < worldMap.getWidth(); ++x) {
@@ -286,7 +303,7 @@ int main() {
                std::cout << "🧟";
                break;
             case TileType::COIN:
-               std::cout << "🪙 ";  //trailing space for the double width
+               std::cout << (player.getScore() < winningScore - 1 ? "🪙 " : "🏁");  //trailing space for the double width and adding the last flag
                break;
             default:
                break;
@@ -300,6 +317,6 @@ int main() {
    }
    std::cout << "\033[?25h";  //to make the cursor reappear
    setRawMode(false);
-   std::cout << std::setw(55) << "GAME ENDED \n";
+   std::cout << std::setw(55) << "GAME OVER \n";
    return 0;
 }
